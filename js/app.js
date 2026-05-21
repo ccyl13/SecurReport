@@ -125,6 +125,10 @@ const UI = {
         conclusionsSection: 'Conclusiones',
         // Preview/PDF translations
         index: 'Índice',
+        auditorDataSection: 'Auditor y Datos de la Auditoría',
+        scopeAndObject: 'Objeto y Alcance',
+        methodologiesApplied: 'Metodologías Aplicadas',
+        auditExecution: 'Ejecución de la Auditoría',
         executiveSummary: 'Resumen Ejecutivo',
         executiveSummaryWithCVSS: 'Resumen Ejecutivo (CVSS)',
         technicalFindings: 'Hallazgos Técnicos',
@@ -224,6 +228,10 @@ const UI = {
         conclusionsSection: 'Conclusions',
         // Preview/PDF translations
         index: 'Index',
+        auditorDataSection: 'Auditor and Audit Data',
+        scopeAndObject: 'Scope and Objectives',
+        methodologiesApplied: 'Applied Methodologies',
+        auditExecution: 'Audit Execution',
         executiveSummary: 'Executive Summary',
         executiveSummaryWithCVSS: 'Executive Summary (CVSS)',
         technicalFindings: 'Technical Findings',
@@ -544,24 +552,9 @@ function renderEditor() {
     `;
 }
 
-function generateAuditSections(findings, auditData, lang) {
+function getMethodologyText(auditData, lang) {
     const isEs = lang !== 'en';
-    const counts = {
-        crit: findings.filter(f => f.severity === 'crit').length,
-        high: findings.filter(f => f.severity === 'high').length,
-        med:  findings.filter(f => f.severity === 'med').length,
-        low:  findings.filter(f => f.severity === 'low').length,
-        info: findings.filter(f => f.severity === 'info').length
-    };
-    const total = findings.length;
-    const target = auditData.targetAsset || (isEs ? 'el sistema objetivo' : 'the target system');
-    const riskLabel = counts.crit > 0 ? (isEs ? 'crítico' : 'critical')
-        : counts.high > 0 ? (isEs ? 'alto' : 'high')
-        : counts.med  > 0 ? (isEs ? 'medio' : 'medium')
-        : counts.low  > 0 ? (isEs ? 'bajo' : 'low')
-        : (isEs ? 'informativo' : 'informational');
-
-    const methodologyIntros = {
+    const map = {
         pentesting_web: isEs
             ? `En primer lugar, se llevó a cabo una fase de reconocimiento pasivo orientada a identificar los activos expuestos públicamente, las tecnologías en uso y posibles vectores de entrada. A continuación, se realizó un análisis activo de la aplicación web mediante técnicas manuales y herramientas especializadas de análisis de seguridad.`
             : `First, a passive reconnaissance phase was conducted to identify publicly exposed assets, technologies in use and potential entry vectors. An active analysis of the web application was then performed using manual techniques and specialised security analysis tools.`,
@@ -584,9 +577,29 @@ function generateAuditSections(findings, auditData, lang) {
             ? `Se llevó a cabo un análisis automático de vulnerabilidades mediante herramientas especializadas de escaneo activo. Los resultados obtenidos fueron revisados y validados manualmente con el fin de descartar falsos positivos y determinar la explotabilidad real de cada hallazgo.`
             : `An automatic vulnerability analysis was carried out using specialised active scanning tools. The results obtained were manually reviewed and validated in order to rule out false positives and determine the real exploitability of each finding.`
     };
-    const methodologyText = methodologyIntros[auditData.auditType] || (isEs
-        ? `Se llevó a cabo una auditoría de seguridad sobre ${target} siguiendo una metodología estructurada que combina técnicas de análisis manual y automatizado.`
-        : `A security audit was conducted on ${target} following a structured methodology combining manual and automated analysis techniques.`);
+    return map[auditData.auditType] || (isEs
+        ? `Se llevó a cabo una auditoría de seguridad sobre ${auditData.targetAsset || 'el sistema objetivo'} siguiendo una metodología estructurada que combina técnicas de análisis manual y automatizado.`
+        : `A security audit was conducted on ${auditData.targetAsset || 'the target system'} following a structured methodology combining manual and automated analysis techniques.`);
+}
+
+function generateAuditSections(findings, auditData, lang) {
+    const isEs = lang !== 'en';
+    const counts = {
+        crit: findings.filter(f => f.severity === 'crit').length,
+        high: findings.filter(f => f.severity === 'high').length,
+        med:  findings.filter(f => f.severity === 'med').length,
+        low:  findings.filter(f => f.severity === 'low').length,
+        info: findings.filter(f => f.severity === 'info').length
+    };
+    const total = findings.length;
+    const target = auditData.targetAsset || (isEs ? 'el sistema objetivo' : 'the target system');
+    const riskLabel = counts.crit > 0 ? (isEs ? 'crítico' : 'critical')
+        : counts.high > 0 ? (isEs ? 'alto' : 'high')
+        : counts.med  > 0 ? (isEs ? 'medio' : 'medium')
+        : counts.low  > 0 ? (isEs ? 'bajo' : 'low')
+        : (isEs ? 'informativo' : 'informational');
+
+    const methodologyText = getMethodologyText(auditData, lang);
 
     // --- ASPECTOS POSITIVOS ---
     const positives = [];
@@ -930,15 +943,26 @@ function renderCvssSummary() {
     `;
 }
 
+function renderSectionHeader(title, id = '') {
+    return `<h2 id="${id}" style="font-size:2rem; color:#111827; margin-bottom:2rem; border-bottom:3px solid #2563eb; padding-bottom:0.75rem; font-weight:800;">${title}</h2>`;
+}
+
+function renderSubsectionHeader(title, id = '', iconStroke = '#2563eb', iconPath = '') {
+    const icon = iconPath ? `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${iconStroke}" stroke-width="2">${iconPath}</svg>` : '';
+    return `<h3 id="${id}" style="font-size:1.35rem; color:#1f2937; margin-bottom:1rem; font-weight:700; display:flex; align-items:center; gap:0.5rem;">${icon}${title}</h3>`;
+}
+
 function renderPreview() {
     if (state.activeTab !== 'preview' || state.showSplash || state.showReportSelector) return '';
 
     const t = UI[state.lang];
     const d = state.auditData;
+    const auditTypeLabel = (t.auditTypes && t.auditTypes[d.auditType]) || d.auditType || '';
+    const classLabel = (t.classifications && t.classifications[d.classification]) || d.classification || '';
 
     return `
         <div class="preview-container">
-            <!-- PORTADA -->
+            <!-- ==================== PORTADA ==================== -->
             <div class="cover-page" style="
                 display: flex;
                 flex-direction: column;
@@ -1018,188 +1042,205 @@ function renderPreview() {
                 </div>
             </div>
             
-            <!-- ÍNDICE -->
+            <!-- ==================== ÍNDICE ==================== -->
             <div class="index-page" style="padding: 4rem 2rem; min-height: 100vh; page-break-after: always; max-width: 900px; margin: 0 auto;">
-                <h2 style="font-size: 2.25rem; color: #111827; margin-bottom: 2.5rem; border-bottom: 2px solid #e5e7eb; padding-bottom: 1rem; font-weight: 800;">${t.index}</h2>
-                
-                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                    <a href="#summary" style="display: flex; justify-content: space-between; text-decoration: none; color: #374151; font-weight: 700; padding: 0.75rem 0; border-bottom: 1px dotted #d1d5db; font-size: 1.125rem; transition: color 0.2s;">
-                        <span>${t.executiveSummaryWithCVSS}</span>
+                <h2 style="font-size:2.25rem; color:#111827; margin-bottom:2.5rem; border-bottom:2px solid #e5e7eb; padding-bottom:1rem; font-weight:800;">${t.index}</h2>
+                <div style="display:flex; flex-direction:column; gap:0.5rem;">
+
+                    <!-- Sección 1: Auditor y datos -->
+                    <a href="#auditor-data" style="display:flex; text-decoration:none; color:#111827; font-weight:700; padding:0.75rem 0; border-bottom:1px dotted #d1d5db; font-size:1.125rem;">
+                        1. ${t.auditorDataSection}
                     </a>
-                    <a href="#incidents" style="display: flex; justify-content: space-between; text-decoration: none; color: #374151; font-weight: 700; padding: 0.75rem 0; border-bottom: 1px dotted #d1d5db; font-size: 1.125rem; transition: color 0.2s;">
-                        <span>${t.incidentsSectionTitle}</span>
+                    <a href="#scope" style="display:flex; text-decoration:none; color:#374151; font-weight:500; padding:0.5rem 0 0.5rem 1.5rem; border-bottom:1px dotted #e5e7eb; font-size:0.95rem;">
+                        1.1 ${t.scopeAndObject}
                     </a>
-                    
-                    ${state.findings.length > 0 ? `<h3 style="margin-top: 2rem; margin-bottom: 1rem; color: #4b5563; font-size: 1.5rem; font-weight: 700;">${t.technicalFindings}</h3>` : ''}
-                    
+                    <a href="#incidents" style="display:flex; text-decoration:none; color:#374151; font-weight:500; padding:0.5rem 0 0.5rem 1.5rem; border-bottom:1px dotted #e5e7eb; font-size:0.95rem;">
+                        1.2 ${t.incidentsSectionTitle}
+                    </a>
+                    <a href="#methodologies" style="display:flex; text-decoration:none; color:#374151; font-weight:500; padding:0.5rem 0 0.5rem 1.5rem; border-bottom:1px dotted #e5e7eb; font-size:0.95rem;">
+                        1.3 ${t.methodologiesApplied}
+                    </a>
+
+                    <!-- Sección 2: Ejecución -->
+                    <a href="#execution" style="display:flex; text-decoration:none; color:#111827; font-weight:700; padding:0.75rem 0; border-bottom:1px dotted #d1d5db; font-size:1.125rem; margin-top:0.5rem;">
+                        2. ${t.auditExecution}
+                    </a>
                     ${state.findings.map((f, idx) => `
-                        <a href="#finding-${idx}" style="display: flex; justify-content: space-between; text-decoration: none; color: #111827; padding: 0.75rem 0; border-bottom: 1px dotted #d1d5db; align-items: center; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#f9fafb'" onmouseout="this.style.backgroundColor='transparent'">
-                            <div style="padding-right: 1rem;">
-                                <span style="display: inline-block; width: 2rem; font-weight: 700; color: #6b7280;">${idx + 1}.</span>
-                                <span style="font-weight: 500;">${escapeHTML(f.title)}</span>
-                            </div>
-                            <div style="display: flex; align-items: center; gap: 1rem;">
-                                <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; padding: 0.25rem 0.5rem; border-radius: 6px; background-color: var(--severity-${f.severity}); color: white; min-width: 80px; text-align: center; display: inline-block;">
-                                    ${t.severityLevels[f.severity]}
-                                </span>
-                                <span style="font-weight: 700; color: #6b7280; font-size: 0.875rem; width: 40px; text-align: right;">${escapeHTML(f.cvss || '-')}</span>
-                            </div>
+                        <a href="#finding-${idx}" style="display:flex; justify-content:space-between; text-decoration:none; color:#374151; padding:0.5rem 0 0.5rem 1.5rem; border-bottom:1px dotted #e5e7eb; align-items:center; font-size:0.95rem;">
+                            <span><span style="font-weight:700; color:#6b7280; margin-right:0.5rem;">2.${idx+1}</span>${escapeHTML(f.title)}</span>
+                            <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; padding:0.2rem 0.5rem; border-radius:5px; background-color:var(--severity-${f.severity}); color:white; white-space:nowrap; margin-left:1rem;">${t.severityLevels[f.severity]}</span>
                         </a>
+                    `).join('')}
+
+                    <!-- Sección 3: Resumen -->
+                    <a href="#audit-summary" style="display:flex; text-decoration:none; color:#111827; font-weight:700; padding:0.75rem 0; border-bottom:1px dotted #d1d5db; font-size:1.125rem; margin-top:0.5rem;">
+                        3. ${t.auditSummarySection}
+                    </a>
+                    <a href="#positive-aspects" style="display:flex; text-decoration:none; color:#374151; font-weight:500; padding:0.5rem 0 0.5rem 1.5rem; border-bottom:1px dotted #e5e7eb; font-size:0.95rem;">
+                        3.1 ${t.positiveAspectsSection}
+                    </a>
+                    <a href="#audit-development" style="display:flex; text-decoration:none; color:#374151; font-weight:500; padding:0.5rem 0 0.5rem 1.5rem; border-bottom:1px dotted #e5e7eb; font-size:0.95rem;">
+                        3.2 ${t.auditDevelopmentSection}
+                    </a>
+                    <a href="#conclusions" style="display:flex; text-decoration:none; color:#374151; font-weight:500; padding:0.5rem 0 0.5rem 1.5rem; border-bottom:1px dotted #e5e7eb; font-size:0.95rem;">
+                        3.3 ${t.conclusionsSection}
+                    </a>
+                </div>
+            </div>
+
+            <!-- ==================== SECCIÓN 1: AUDITOR Y DATOS ==================== -->
+            <div id="auditor-data" style="padding:2rem 0; page-break-before:always;">
+                ${renderSectionHeader(t.auditorDataSection, '')}
+
+                <!-- 1.1 Objeto y Alcance -->
+                ${renderSubsectionHeader(t.scopeAndObject, 'scope', '#2563eb', '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline>')}
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; margin-bottom:2.5rem;">
+                    ${[
+                        [t.documentTitle,    escapeHTML(d.documentTitle)],
+                        [t.targetAsset,      escapeHTML(d.targetAsset)],
+                        [t.clientCompany,    escapeHTML(d.clientCompany)],
+                        [t.auditorCompany,   escapeHTML(d.auditorCompany)],
+                        [t.auditorName,      escapeHTML(d.auditorName)],
+                        [t.auditType,        escapeHTML(auditTypeLabel)],
+                        [t.classification,   escapeHTML(classLabel)],
+                        [t.date,             escapeHTML(d.date)],
+                        [t.version,          escapeHTML(d.version)]
+                    ].map(([label, val], i) => `
+                        <div style="display:flex; padding:0.85rem 1.5rem; ${i % 2 === 0 ? 'background:#f8fafc;' : 'background:#fff;'} border-bottom:1px solid #e2e8f0;">
+                            <span style="font-size:0.78rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; min-width:200px;">${label}</span>
+                            <span style="font-size:0.95rem; font-weight:600; color:#111827;">${val}</span>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <!-- 1.2 Incidencias -->
+                ${renderSubsectionHeader(t.incidentsSectionTitle, 'incidents', '#f97316', '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>')}
+                <div style="margin-bottom:2.5rem;">
+                    ${d.hasIncidents ? `
+                        <div style="background:#fff7ed; border:1px solid #fed7aa; border-left:6px solid #f97316; border-radius:10px; padding:1.5rem 2rem;">
+                            <p style="font-weight:700; color:#c2410c; margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem;">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                                ${t.incidentsRecorded}
+                            </p>
+                            <p style="color:#9a3412; line-height:1.7; white-space:pre-wrap; text-align:justify;">${formatMultiline(d.incidentsText || '')}</p>
+                        </div>
+                    ` : `
+                        <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-left:6px solid #22c55e; border-radius:10px; padding:1.5rem 2rem; display:flex; align-items:center; gap:1rem;">
+                            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                            <p style="color:#166534; font-weight:600; font-size:1rem; margin:0;">${t.incidentsNoneText}</p>
+                        </div>
+                    `}
+                </div>
+
+                <!-- 1.3 Metodologías aplicadas -->
+                ${renderSubsectionHeader(t.methodologiesApplied, 'methodologies', '#7c3aed', '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>')}
+                <div style="background:#faf5ff; border:1px solid #e9d5ff; border-radius:10px; padding:1.5rem 2rem; line-height:1.8; color:#374151; text-align:justify; margin-bottom:2rem;">
+                    <span style="white-space:pre-wrap;">${formatMultiline(escapeHTML(getMethodologyText(d, state.lang)))}</span>
+                </div>
+            </div>
+
+            <!-- ==================== SECCIÓN 2: EJECUCIÓN ==================== -->
+            <div id="execution" style="padding:2rem 0; page-break-before:always;">
+                ${renderSectionHeader(t.auditExecution, '')}
+                ${renderCvssSummary()}
+                <div class="findings-preview" style="margin-top:2rem;">
+                    ${state.findings.length === 0 ? `<p style="color:#6b7280; font-style:italic;">${t.noFindings}</p>` : ''}
+                    ${state.findings.map((f, idx) => `
+                        <div id="finding-${idx}" class="finding-preview severity-${f.severity}" style="margin-bottom:3rem; background:white; padding:2rem; border-radius:12px; border-left:6px solid var(--severity-${f.severity}); box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);">
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1.5rem; border-bottom:1px solid #e5e7eb; padding-bottom:1rem;">
+                                <h3 style="font-size:1.5rem; font-weight:800; color:#111827; margin:0;">2.${idx+1}. ${escapeHTML(f.title)}</h3>
+                                <div style="background-color:var(--severity-${f.severity}); color:white; padding:0.5rem 1rem; border-radius:8px; font-weight:700; font-size:0.875rem; text-transform:uppercase; white-space:nowrap; margin-left:1rem;">
+                                    ${t.severityLevels[f.severity]}
+                                </div>
+                            </div>
+                            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:1.5rem; margin-bottom:2rem;">
+                                <div style="background:#f9fafb; padding:1rem 1.5rem; border-radius:8px; border:1px solid #e5e7eb;">
+                                    <p style="font-size:0.75rem; font-weight:700; color:#6b7280; text-transform:uppercase; margin-bottom:0.25rem;">${t.cvssScore}</p>
+                                    <p style="font-size:1.25rem; font-weight:800; color:#111827; margin:0;">${escapeHTML(f.cvss || t.na)}</p>
+                                </div>
+                                <div style="background:#f9fafb; padding:1rem 1.5rem; border-radius:8px; border:1px solid #e5e7eb;">
+                                    <p style="font-size:0.75rem; font-weight:700; color:#6b7280; text-transform:uppercase; margin-bottom:0.25rem;">${t.cveId}</p>
+                                    <p style="font-size:1.25rem; font-weight:800; color:#111827; margin:0;">${escapeHTML(f.cve || t.na)}</p>
+                                </div>
+                                <div style="background:#f9fafb; padding:1rem 1.5rem; border-radius:8px; border:1px solid #e5e7eb;">
+                                    <p style="font-size:0.75rem; font-weight:700; color:#6b7280; text-transform:uppercase; margin-bottom:0.25rem;">${t.referenceUrl}</p>
+                                    <p style="font-size:0.875rem; font-weight:500; color:#3b82f6; margin:0; word-break:break-all;">${f.reference ? `<a href="${escapeHTML(f.reference)}" target="_blank" style="color:#3b82f6; text-decoration:none;">${escapeHTML(f.reference)}</a>` : t.na}</p>
+                                </div>
+                            </div>
+                            ${f.description ? `
+                                <div style="margin-bottom:1.5rem;">
+                                    <h4 style="font-size:1.125rem; font-weight:700; color:#374151; margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem;">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                        ${t.description}
+                                    </h4>
+                                    <p style="color:#4b5563; line-height:1.6; text-align:justify;"><span style="white-space:pre-wrap;">${formatMultiline(f.description)}</span></p>
+                                </div>
+                            ` : ''}
+                            ${f.poc ? `
+                                <div style="margin-bottom:1.5rem; background:#1e293b; padding:1.5rem; border-radius:8px; border:1px solid #0f172a;">
+                                    <h4 style="font-size:1.125rem; font-weight:700; color:#f8fafc; margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem;">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                                        ${t.pocSteps}
+                                    </h4>
+                                    <p style="font-family:monospace; line-height:1.75; font-size:0.875rem; color:#e2e8f0; margin:0; text-align:justify;"><span style="white-space:pre-wrap;">${formatMultiline(f.poc)}</span></p>
+                                </div>
+                            ` : ''}
+                            ${f.images && f.images.length > 0 ? `
+                                <div style="margin-bottom:1.5rem;">
+                                    <h4 style="font-size:1.125rem; font-weight:700; color:#374151; margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem;">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                                        ${t.evidence}
+                                    </h4>
+                                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1rem;">
+                                        ${f.images.map((img, imgIdx) => `
+                                            <div style="border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; break-inside:avoid; background:#fff; padding:0.5rem;">
+                                                <img src="${img}" alt="${t.evidence} ${imgIdx+1}" style="width:100%; height:auto; border-radius:4px; display:block;">
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            ` : ''}
+                            ${f.impact ? `
+                                <div style="margin-bottom:1.5rem;">
+                                    <h4 style="font-size:1.125rem; font-weight:700; color:#dc2626; margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem;">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                                        ${t.businessImpact}
+                                    </h4>
+                                    <p style="color:#4b5563; line-height:1.6; text-align:justify;"><span style="white-space:pre-wrap;">${formatMultiline(f.impact)}</span></p>
+                                </div>
+                            ` : ''}
+                            ${f.remediation ? `
+                                <div style="background:#f0fdf4; padding:1.5rem; border-radius:8px; border:1px solid #bbf7d0;">
+                                    <h4 style="font-size:1.125rem; font-weight:700; color:#166534; margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem;">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                                        ${t.solutionRemediation}
+                                    </h4>
+                                    <p style="color:#15803d; line-height:1.6; text-align:justify;"><span style="white-space:pre-wrap;">${formatMultiline(f.remediation)}</span></p>
+                                </div>
+                            ` : ''}
+                        </div>
                     `).join('')}
                 </div>
             </div>
-            
-            <!-- RESUMEN EJECUTIVO + INCIDENCIAS (misma página) -->
-            <div style="padding: 2rem 0; page-break-inside: avoid;">
-                <div id="summary" style="margin-bottom: 3rem;">
-                    <h2 style="font-size: 1.75rem; color: #111827; margin-bottom: 1.5rem; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.75rem; font-weight: 800;">${t.executiveSummary}</h2>
-                    ${renderCvssSummary()}
-                </div>
-                
-                <div id="incidents">
-                    <h2 style="font-size: 1.75rem; color: #111827; margin-bottom: 1rem; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.75rem; font-weight: 800;">${t.incidentsSectionTitle}</h2>
-                ${d.hasIncidents ? `
-                    <div style="background:#fff7ed; border:1px solid #fed7aa; border-left:6px solid #f97316; border-radius:10px; padding:1.5rem 2rem;">
-                        <p style="font-weight:700; color:#c2410c; margin-bottom:0.75rem; font-size:1rem; display:flex; align-items:center; gap:0.5rem;">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                            ${t.incidentsRecorded}
-                        </p>
-                        <p style="color:#9a3412; line-height:1.7; white-space:pre-wrap; text-align: justify;">${formatMultiline(d.incidentsText || '')}</p>
-                    </div>
-                ` : `
-                    <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-left:6px solid #22c55e; border-radius:10px; padding:1.5rem 2rem; display:flex; align-items:center; gap:1rem;">
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                        <p style="color:#166534; font-weight:600; font-size:1.05rem; margin:0;">${t.incidentsNoneText}</p>
-                    </div>
-                `}
-            </div>
 
-            <!-- HALLAZGOS TÉCNICOS -->
-            <div class="findings-preview">
-                ${state.findings.map((f, idx) => `
-                    <div id="finding-${idx}" class="finding-preview severity-${f.severity}" style="margin-bottom: 3rem; background: ${state.reportTheme === 'dark' ? '#1e293b' : 'white'}; padding: 2rem; border-radius: 12px; border-left: 6px solid var(--severity-${f.severity}); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; border-bottom: 1px solid #e5e7eb; padding-bottom: 1rem; page-break-after: avoid;">
-                            <h3 style="font-size: 1.5rem; font-weight: 800; color: #111827; margin: 0;">${idx + 1}. ${escapeHTML(f.title)}</h3>
-                            <div style="background-color: var(--severity-${f.severity}); color: white; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 700; font-size: 0.875rem; text-transform: uppercase; white-space: nowrap; margin-left: 1rem;">
-                                ${t.severityLevels[f.severity]}
-                            </div>
-                        </div>
-                        
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
-                            <div style="background: #f9fafb; padding: 1rem 1.5rem; border-radius: 8px; border: 1px solid #e5e7eb;">
-                                <p style="font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase; margin-bottom: 0.25rem;">${t.cvssScore}</p>
-                                <p style="font-size: 1.25rem; font-weight: 800; color: #111827; margin: 0;">${escapeHTML(f.cvss || t.na)}</p>
-                            </div>
-                            <div style="background: #f9fafb; padding: 1rem 1.5rem; border-radius: 8px; border: 1px solid #e5e7eb;">
-                                <p style="font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase; margin-bottom: 0.25rem;">${t.cveId}</p>
-                                <p style="font-size: 1.25rem; font-weight: 800; color: #111827; margin: 0;">${escapeHTML(f.cve || t.na)}</p>
-                            </div>
-                            <div style="background: #f9fafb; padding: 1rem 1.5rem; border-radius: 8px; border: 1px solid #e5e7eb;">
-                                <p style="font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase; margin-bottom: 0.25rem;">${t.referenceUrl}</p>
-                                <p style="font-size: 0.875rem; font-weight: 500; color: #3b82f6; margin: 0; word-break: break-all;">${f.reference ? `<a href="${escapeHTML(f.reference)}" target="_blank" style="color: #3b82f6; text-decoration: none;">${escapeHTML(f.reference)}</a>` : t.na}</p>
-                            </div>
-                        </div>
-                        
-                        ${f.description ? `
-                            <div style="margin-bottom: 1.5rem;">
-                                <h4 style="font-size: 1.125rem; font-weight: 700; color: #374151; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                                    ${t.description}
-                                </h4>
-                                <p style="color: #4b5563; line-height: 1.6; word-wrap: break-word; text-align: justify;"><span style="white-space: pre-wrap;">${formatMultiline(f.description)}</span></p>
-                            </div>
-                        ` : ''}
-                        
-                        ${f.poc ? `
-                            <div style="margin-bottom: 1.5rem; background: #1e293b; color: #e2e8f0; padding: 1.5rem; border-radius: 8px; border: 1px solid #0f172a;">
-                                <h4 style="font-size: 1.125rem; font-weight: 700; color: #f8fafc; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; color: #f8fafc;">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
-                                    ${t.pocSteps}
-                                </h4>
-                                <p style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; line-height: 1.75; font-size: 0.875rem; color: #e2e8f0; margin: 0; text-align: justify;"><span style="white-space: pre-wrap;">${formatMultiline(f.poc)}</span></p>
-                            </div>
-                        ` : ''}
-                        
-                        ${f.images && f.images.length > 0 ? `
-                            <div style="margin-bottom: 1.5rem;">
-                                <h4 style="font-size: 1.125rem; font-weight: 700; color: #374151; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                                    ${t.evidence}
-                                </h4>
-                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem;">
-                                    ${f.images.map((img, imgIdx) => `
-                                        <div style="border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; break-inside: avoid; background: #fff; padding: 0.5rem;">
-                                            <img src="${img}" alt="${t.evidence} ${imgIdx + 1}" style="width: 100%; height: auto; border-radius: 4px; display: block;">
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </div>
-                        ` : ''}
-                        
-                        ${f.impact ? `
-                            <div style="margin-bottom: 1.5rem;">
-                                <h4 style="font-size: 1.125rem; font-weight: 700; color: #dc2626; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                                    ${t.businessImpact}
-                                </h4>
-                                <p style="color: #4b5563; line-height: 1.6; word-wrap: break-word; text-align: justify;"><span style="white-space: pre-wrap;">${formatMultiline(f.impact)}</span></p>
-                            </div>
-                        ` : ''}
-                        
-                        ${f.remediation ? `
-                            <div style="margin-bottom: 0; background: #f0fdf4; padding: 1.5rem; border-radius: 8px; border: 1px solid #bbf7d0;">
-                                <h4 style="font-size: 1.125rem; font-weight: 700; color: #166534; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                                    ${t.solutionRemediation}
-                                </h4>
-                                <p style="color: #15803d; line-height: 1.6; word-wrap: break-word; text-align: justify;"><span style="white-space: pre-wrap;">${formatMultiline(f.remediation)}</span></p>
-                            </div>
-                        ` : ''}
-                    </div>
-                `).join('')}
-            </div>
-
-            <!-- RESUMEN DE LA AUDITORÍA (auto-generado) -->
+            <!-- ==================== SECCIÓN 3: RESUMEN DE LA AUDITORÍA ==================== -->
             ${(() => {
                 const sections = generateAuditSections(state.findings, d, state.lang);
                 const subsections = [
-                    {
-                        id: 'positive-aspects',
-                        label: t.positiveAspectsSection,
-                        text: sections.positiveAspects,
-                        bg: '#f0fdf4', border: '#bbf7d0', iconStroke: '#059669',
-                        iconPath: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>'
-                    },
-                    {
-                        id: 'audit-development',
-                        label: t.auditDevelopmentSection,
-                        text: sections.auditDevelopment,
-                        bg: '#eff6ff', border: '#bfdbfe', iconStroke: '#3b82f6',
-                        iconPath: '<circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>'
-                    },
-                    {
-                        id: 'conclusions',
-                        label: t.conclusionsSection,
-                        text: sections.conclusions,
-                        bg: '#faf5ff', border: '#e9d5ff', iconStroke: '#7c3aed',
-                        iconPath: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M12 8v4"></path><path d="M12 16h.01"></path>'
-                    }
+                    { id:'positive-aspects',  label:t.positiveAspectsSection,  text:sections.positiveAspects,  bg:'#f0fdf4', border:'#bbf7d0', iconStroke:'#059669', iconPath:'<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>' },
+                    { id:'audit-development', label:t.auditDevelopmentSection, text:sections.auditDevelopment, bg:'#eff6ff', border:'#bfdbfe', iconStroke:'#3b82f6', iconPath:'<circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>' },
+                    { id:'conclusions',       label:t.conclusionsSection,      text:sections.conclusions,      bg:'#faf5ff', border:'#e9d5ff', iconStroke:'#7c3aed', iconPath:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M12 8v4"></path><path d="M12 16h.01"></path>' }
                 ];
                 return `
-                <div style="padding: 2rem 0; page-break-before: always;">
-                    <h2 style="font-size: 2rem; color: #111827; margin-bottom: 2rem; border-bottom: 3px solid #2563eb; padding-bottom: 0.75rem; font-weight: 800;">
-                        ${t.auditSummarySection}
-                    </h2>
+                <div id="audit-summary" style="padding:2rem 0; page-break-before:always;">
+                    ${renderSectionHeader(t.auditSummarySection, '')}
                     ${subsections.map(s => `
-                    <div id="${s.id}" style="margin-bottom: 2.5rem;">
-                        <h3 style="font-size: 1.35rem; color: #1f2937; margin-bottom: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${s.iconStroke}" stroke-width="2">${s.iconPath}</svg>
-                            ${s.label}
-                        </h3>
-                        <div style="background: ${s.bg}; border: 1px solid ${s.border}; border-radius: 10px; padding: 1.5rem; line-height: 1.8; color: #374151; text-align: justify;">
-                            <span style="white-space: pre-wrap;">${formatMultiline(escapeHTML(s.text))}</span>
+                        <div style="margin-bottom:2.5rem;">
+                            ${renderSubsectionHeader(s.label, s.id, s.iconStroke, s.iconPath)}
+                            <div style="background:${s.bg}; border:1px solid ${s.border}; border-radius:10px; padding:1.5rem 2rem; line-height:1.8; color:#374151; text-align:justify;">
+                                <span style="white-space:pre-wrap;">${formatMultiline(escapeHTML(s.text))}</span>
+                            </div>
                         </div>
-                    </div>
                     `).join('')}
                 </div>`;
             })()}
