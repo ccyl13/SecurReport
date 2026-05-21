@@ -393,6 +393,10 @@ function renderNavbar() {
             
             <div class="navbar-actions">
                 <button class="${state.showReportSelector ? 'active' : ''}" onclick="showReports()">${t.myReports}</button>
+                <button onclick="createNewReport()" style="display:flex;align-items:center;gap:0.4rem;background:#16a34a;color:white;border:none;padding:0.45rem 0.9rem;border-radius:6px;font-weight:700;cursor:pointer;font-size:0.85rem;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    ${t.createNewReport}
+                </button>
                 <button class="${state.activeTab === 'editor' && !state.showReportSelector ? 'active' : ''}" onclick="hideReports(); setTab('editor')">${t.editor}</button>
                 <button class="${state.activeTab === 'preview' && !state.showReportSelector ? 'active' : ''}" onclick="hideReports(); setTab('preview')">${t.preview}</button>
                 ${state.activeTab === 'preview' && !state.showReportSelector ? `
@@ -1272,6 +1276,10 @@ function renderReportsPage() {
             <div class="reports-header">
                 <h1>${t.myReports}</h1>
                 <div class="reports-actions">
+                    <button class="btn-primary" onclick="createNewReport()" style="display:flex;align-items:center;gap:0.4rem;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        ${t.createNewReport}
+                    </button>
                     <button class="btn-secondary" onclick="exportDatabase()">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -1776,6 +1784,9 @@ async function loadSavedReports() {
 
 async function createNewReport() {
     try {
+        if (state.currentReportId) {
+            await saveCurrentReport();
+        }
         const report = await API.reports.create({
             document_title: 'Nuevo Reporte',
             client_company: 'Empresa',
@@ -1792,6 +1803,25 @@ async function createNewReport() {
         state.currentReportId = report.id;
         state.findings = [];
         state.isDirty = false;
+        state.auditData = {
+            documentTitle: 'Nuevo Reporte',
+            clientCompany: 'Empresa Cliente',
+            clientLogo: ['', ''],
+            targetAsset: 'Sistema',
+            auditorCompany: 'Empresa Auditora',
+            auditorName: '',
+            classification: '2',
+            version: '1.0',
+            date: new Date().toISOString().split('T')[0],
+            lang: state.lang,
+            auditType: 'pentesting_web',
+            hasIncidents: false,
+            incidentsText: '',
+            auditSummary: '',
+            testsPerformed: '',
+            recommendedSolutions: ''
+        };
+        state.activeTab = 'editor';
         hideReports();
     } catch (err) {
         alert('Error creating report: ' + err.message);
@@ -1800,6 +1830,9 @@ async function createNewReport() {
 
 async function loadReport(id) {
     try {
+        if (state.currentReportId && state.currentReportId !== id) {
+            await saveCurrentReport();
+        }
         const report = await API.reports.getById(id);
         state.currentReportId = report.id;
         state.auditData = {
@@ -1834,6 +1867,7 @@ async function loadReport(id) {
         }
         
         state.isDirty = false;
+        state.activeTab = 'editor';
         hideReports();
     } catch (err) {
         alert('Error loading report: ' + err.message);
