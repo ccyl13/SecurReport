@@ -603,8 +603,6 @@ function generateAuditSections(findings, auditData, lang) {
         : counts.low  > 0 ? (isEs ? 'bajo' : 'low')
         : (isEs ? 'informativo' : 'informational');
 
-    const methodologyText = getMethodologyText(auditData, lang);
-
     // --- ASPECTOS POSITIVOS ---
     const positives = [];
     if (counts.crit === 0 && counts.high === 0) {
@@ -633,11 +631,11 @@ function generateAuditSections(findings, auditData, lang) {
     const positiveAspects = positives.join('\n\n');
 
     // --- DESARROLLO DE LA AUDITORÍA ---
-    let auditDevelopment = methodologyText;
+    let auditDevelopment = '';
     if (total === 0) {
-        auditDevelopment += isEs
-            ? `\n\nA lo largo del proceso de evaluación no se identificaron vulnerabilidades explotables en el sistema.`
-            : `\n\nThroughout the evaluation process, no exploitable vulnerabilities were identified in the system.`;
+        auditDevelopment = isEs
+            ? `A lo largo del proceso de evaluación no se identificaron vulnerabilidades explotables en el sistema. La superficie analizada no presentó vectores de ataque aprovechables dentro del alcance definido.`
+            : `Throughout the evaluation process, no exploitable vulnerabilities were identified in the system. The analysed surface did not present exploitable attack vectors within the defined scope.`;
     } else {
         const countParts = [];
         if (counts.crit > 0) countParts.push(isEs ? `${counts.crit} de criticidad crítica` : `${counts.crit} critical`);
@@ -645,36 +643,53 @@ function generateAuditSections(findings, auditData, lang) {
         if (counts.med  > 0) countParts.push(isEs ? `${counts.med} de criticidad media` : `${counts.med} medium`);
         if (counts.low  > 0) countParts.push(isEs ? `${counts.low} de criticidad baja` : `${counts.low} low`);
         if (counts.info > 0) countParts.push(isEs ? `${counts.info} de carácter informativo` : `${counts.info} informational`);
-        auditDevelopment += isEs
-            ? `\n\nA lo largo del proceso se identificaron un total de ${total} vulnerabilidad${total !== 1 ? 'es' : ''}: ${countParts.join(', ')}.`
-            : `\n\nThroughout the process, a total of ${total} vulnerabilit${total !== 1 ? 'ies were' : 'y was'} identified: ${countParts.join(', ')}.`;
+
+        auditDevelopment = isEs
+            ? `Durante la ejecución de la auditoría sobre ${target} se identificaron un total de ${total} vulnerabilidad${total !== 1 ? 'es' : ''}, distribuidas de la siguiente forma: ${countParts.join(', ')}.`
+            : `During the execution of the audit on ${target}, a total of ${total} vulnerabilit${total !== 1 ? 'ies were' : 'y was'} identified, distributed as follows: ${countParts.join(', ')}.`;
 
         const critHighFindings = findings.filter(f => f.severity === 'crit' || f.severity === 'high');
         if (critHighFindings.length > 0) {
-            const sevWord = { crit: isEs ? 'crítica' : 'critical', high: isEs ? 'alta' : 'high' };
-            const desc = critHighFindings.map(f => {
-                const imp = f.impact ? (isEs ? ` con impacto en ${f.impact.split('.')[0].substring(0,80)}` : ` with impact on ${f.impact.split('.')[0].substring(0,80)}`) : '';
-                return `"${f.title}" (${sevWord[f.severity]})${imp}`;
-            }).join('; ');
-            auditDevelopment += isEs
-                ? ` Entre los hallazgos de mayor relevancia figuran: ${desc}.`
-                : ` Among the most relevant findings are: ${desc}.`;
+            const sevLabel = { crit: isEs ? 'Crítica' : 'Critical', high: isEs ? 'Alta' : 'High' };
+            critHighFindings.forEach(f => {
+                const descSnippet = f.description ? f.description.replace(/<[^>]+>/g, '').substring(0, 180).trimEnd() : '';
+                const impactSnippet = f.impact ? f.impact.replace(/<[^>]+>/g, '').split('.')[0].substring(0, 150).trimEnd() : '';
+                let para = isEs
+                    ? `\n\nSe detectó la vulnerabilidad "${f.title}" con una severidad ${sevLabel[f.severity]}.`
+                    : `\n\nThe vulnerability "${f.title}" was detected with ${sevLabel[f.severity]} severity.`;
+                if (descSnippet) {
+                    para += isEs
+                        ? ` ${descSnippet}${descSnippet.length === 180 ? '...' : ''}`
+                        : ` ${descSnippet}${descSnippet.length === 180 ? '...' : ''}`;
+                }
+                if (impactSnippet) {
+                    para += isEs
+                        ? ` El impacto asociado a esta vulnerabilidad recae sobre ${impactSnippet}.`
+                        : ` The impact associated with this vulnerability falls on ${impactSnippet}.`;
+                }
+                auditDevelopment += para;
+            });
         }
 
         const medFindings = findings.filter(f => f.severity === 'med');
         if (medFindings.length > 0) {
-            const list = medFindings.map(f => `"${f.title}"`).join(', ');
+            const items = medFindings.map(f => {
+                const descSnippet = f.description ? f.description.replace(/<[^>]+>/g, '').substring(0, 100).trimEnd() : '';
+                return descSnippet
+                    ? (isEs ? `"${f.title}": ${descSnippet}${descSnippet.length === 100 ? '...' : ''}` : `"${f.title}": ${descSnippet}${descSnippet.length === 100 ? '...' : ''}`)
+                    : `"${f.title}"`;
+            }).join(isEs ? '; ' : '; ');
             auditDevelopment += isEs
-                ? `\n\nAdicionalmente, se detectaron ${medFindings.length} vulnerabilidad${medFindings.length !== 1 ? 'es' : ''} de severidad media: ${list}.`
-                : `\n\nAdditionally, ${medFindings.length} medium severity vulnerabilit${medFindings.length !== 1 ? 'ies were' : 'y was'} detected: ${list}.`;
+                ? `\n\nEn el rango de severidad media se identificaron ${medFindings.length} vulnerabilidad${medFindings.length !== 1 ? 'es' : ''}: ${items}.`
+                : `\n\nIn the medium severity range, ${medFindings.length} vulnerabilit${medFindings.length !== 1 ? 'ies were' : 'y was'} identified: ${items}.`;
         }
 
         const lowInfoFindings = findings.filter(f => f.severity === 'low' || f.severity === 'info');
         if (lowInfoFindings.length > 0) {
             const list = lowInfoFindings.map(f => `"${f.title}"`).join(', ');
             auditDevelopment += isEs
-                ? `\n\nPor último, se registraron ${lowInfoFindings.length} hallazgo${lowInfoFindings.length !== 1 ? 's' : ''} de baja criticidad o de tipo informativo: ${list}.`
-                : `\n\nFinally, ${lowInfoFindings.length} low severity or informational finding${lowInfoFindings.length !== 1 ? 's were' : ' was'} recorded: ${list}.`;
+                ? `\n\nPor último, se registraron ${lowInfoFindings.length} hallazgo${lowInfoFindings.length !== 1 ? 's' : ''} de baja criticidad o carácter informativo: ${list}. Estos hallazgos no representan un riesgo operativo inmediato, si bien su corrección contribuye a la mejora del nivel de seguridad global del sistema.`
+                : `\n\nFinally, ${lowInfoFindings.length} low severity or informational finding${lowInfoFindings.length !== 1 ? 's were' : ' was'} recorded: ${list}. These findings do not represent an immediate operational risk, although addressing them contributes to improving the overall security level of the system.`;
         }
     }
 
@@ -723,6 +738,91 @@ function generateAuditSections(findings, auditData, lang) {
     }
 
     return { positiveAspects, auditDevelopment, conclusions };
+}
+
+function renderMethodologiesContent(auditData, lang) {
+    const isEs = lang !== 'en';
+    const auditTypeText = getMethodologyText(auditData, lang);
+
+    const cvssTable = `
+        <table style="width:100%; border-collapse:collapse; margin:0.75rem 0 1rem; font-size:0.85rem;">
+            <thead>
+                <tr style="background:#7c3aed; color:white;">
+                    <th style="padding:0.4rem 0.75rem; text-align:left; border-radius:4px 0 0 0;">${isEs ? 'Clasificación' : 'Classification'}</th>
+                    <th style="padding:0.4rem 0.75rem; text-align:left;">CVSS</th>
+                    <th style="padding:0.4rem 0.75rem; text-align:left; border-radius:0 4px 0 0;">${isEs ? 'Descripción' : 'Description'}</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="background:#fff1f2;">
+                    <td style="padding:0.35rem 0.75rem; font-weight:700; color:#dc2626;">${isEs ? 'CRÍTICA' : 'CRITICAL'}</td>
+                    <td style="padding:0.35rem 0.75rem; color:#dc2626; font-weight:600;">9.0 – 10.0</td>
+                    <td style="padding:0.35rem 0.75rem; color:#374151;">${isEs ? 'Requieren atención urgente. Su explotación puede dar al atacante control total sobre el sistema.' : 'Require urgent attention. Exploitation may give the attacker full control over the system.'}</td>
+                </tr>
+                <tr style="background:#fff7ed;">
+                    <td style="padding:0.35rem 0.75rem; font-weight:700; color:#ea580c;">${isEs ? 'ALTA' : 'HIGH'}</td>
+                    <td style="padding:0.35rem 0.75rem; color:#ea580c; font-weight:600;">7.0 – 8.9</td>
+                    <td style="padding:0.35rem 0.75rem; color:#374151;">${isEs ? 'Deben corregirse prioritariamente. Pueden comprometer información confidencial o facilitar el acceso no autorizado.' : 'Should be fixed with priority. They can compromise confidential information or facilitate unauthorised access.'}</td>
+                </tr>
+                <tr style="background:#fefce8;">
+                    <td style="padding:0.35rem 0.75rem; font-weight:700; color:#ca8a04;">${isEs ? 'MEDIA' : 'MEDIUM'}</td>
+                    <td style="padding:0.35rem 0.75rem; color:#ca8a04; font-weight:600;">4.0 – 6.9</td>
+                    <td style="padding:0.35rem 0.75rem; color:#374151;">${isEs ? 'Riesgo moderado. Pueden actuar como vectores de acceso secundarios si no se subsanan.' : 'Moderate risk. May act as secondary access vectors if not remediated.'}</td>
+                </tr>
+                <tr style="background:#f0fdf4;">
+                    <td style="padding:0.35rem 0.75rem; font-weight:700; color:#16a34a;">${isEs ? 'BAJA' : 'LOW'}</td>
+                    <td style="padding:0.35rem 0.75rem; color:#16a34a; font-weight:600;">0.1 – 3.9</td>
+                    <td style="padding:0.35rem 0.75rem; color:#374151;">${isEs ? 'Bajo impacto directo. Útiles para recolección de información por el atacante. Deben contemplarse en la hoja de ruta de mejora.' : 'Low direct impact. Useful for attacker information gathering. Should be addressed in the improvement roadmap.'}</td>
+                </tr>
+            </tbody>
+        </table>`;
+
+    const frameworks = [
+        {
+            name: 'OWASP',
+            subtitle: isEs ? '(Open Web Application Security Project)' : '(Open Web Application Security Project)',
+            body: isEs
+                ? `Proyecto de código abierto centrado en la identificación y mitigación de vulnerabilidades en aplicaciones software. Como referencia principal se emplea el <strong>OWASP Top 10 (2021)</strong>, que recoge los diez riesgos más críticos en aplicaciones web: A1-Pérdida de control de acceso, A2-Fallos criptográficos, A3-Inyección, A4-Diseño inseguro, A5-Configuración de seguridad incorrecta, A6-Componentes desactualizados o vulnerables, A7-Fallos de identificación y autenticación, A8-Fallos de integridad del software, A9-Fallos de monitorización y logs, A10-SSRF.`
+                : `Open-source project focused on identifying and mitigating vulnerabilities in software applications. The main reference used is the <strong>OWASP Top 10 (2021)</strong>, which covers the ten most critical risks in web applications: A1-Broken Access Control, A2-Cryptographic Failures, A3-Injection, A4-Insecure Design, A5-Security Misconfiguration, A6-Vulnerable and Outdated Components, A7-Identification and Authentication Failures, A8-Software and Data Integrity Failures, A9-Security Logging and Monitoring Failures, A10-SSRF.`
+        },
+        {
+            name: 'OSSTMM',
+            subtitle: isEs ? '(Open Source Security Testing Methodology Manual)' : '(Open Source Security Testing Methodology Manual)',
+            body: isEs
+                ? `Uno de los estándares profesionales más completos para auditorías de seguridad. Establece un marco de trabajo estructurado en seis secciones que abarca la seguridad de la información, de los procesos, de las tecnologías de internet, de las comunicaciones, de las redes inalámbricas y de la seguridad física. Su aplicación garantiza una cobertura sistemática y exhaustiva del alcance evaluado.`
+                : `One of the most comprehensive professional standards for security audits. It establishes a structured framework covering six sections: information security, process security, internet technology security, communications security, wireless security and physical security. Its application ensures systematic and thorough coverage of the evaluated scope.`
+        },
+        {
+            name: 'CVSS',
+            subtitle: isEs ? '(Common Vulnerability Scoring System)' : '(Common Vulnerability Scoring System)',
+            body: isEs
+                ? `Framework abierto y universalmente adoptado para comunicar las características, el impacto y la severidad de las vulnerabilidades detectadas. El sistema de puntuación se compone de tres grupos de métricas —Base, Temporal y de Entorno— y permite establecer una priorización objetiva de la remediación. La siguiente tabla refleja la escala de equivalencias empleada en este informe:`
+                : `Open and universally adopted framework for communicating the characteristics, impact and severity of detected vulnerabilities. The scoring system is composed of three metric groups —Base, Temporal and Environmental— and enables objective prioritisation of remediation. The following table reflects the equivalence scale used in this report:`,
+            extra: cvssTable
+        },
+        {
+            name: 'MITRE ATT&CK',
+            subtitle: isEs ? '(Adversarial Tactics, Techniques and Common Knowledge)' : '(Adversarial Tactics, Techniques and Common Knowledge)',
+            body: isEs
+                ? `Base de conocimientos globalmente reconocida que describe las tácticas, técnicas y procedimientos (TTP) empleados por actores maliciosos en ataques reales. En el contexto de esta auditoría, la Matriz MITRE ATT&CK sirve como marco de referencia para evaluar la robustez de la infraestructura frente a las técnicas de ataque documentadas y para contextualizar los hallazgos dentro del ciclo de ataque completo.`
+                : `Globally recognised knowledge base describing the tactics, techniques and procedures (TTPs) used by threat actors in real-world attacks. In the context of this audit, the MITRE ATT&CK Matrix serves as a reference framework to assess the robustness of the infrastructure against documented attack techniques and to contextualise findings within the full attack lifecycle.`
+        }
+    ];
+
+    const frameworksHTML = frameworks.map(fw => `
+        <div style="margin-top:1.25rem;">
+            <p style="margin:0 0 0.35rem;"><strong style="color:#4c1d95;">${fw.name}</strong> <span style="color:#6b7280; font-size:0.9em;">${fw.subtitle}</span></p>
+            <p style="margin:0; text-align:justify;">${fw.body}</p>
+            ${fw.extra || ''}
+        </div>`).join('');
+
+    return `
+        <p style="margin:0 0 1.25rem; text-align:justify;">${auditTypeText}</p>
+        <hr style="border:none; border-top:1px solid #e9d5ff; margin:1.25rem 0;">
+        <p style="margin:0 0 0.75rem; font-weight:700; color:#4c1d95; font-size:0.95rem; text-transform:uppercase; letter-spacing:0.05em;">
+            ${isEs ? 'Marcos de referencia aplicados' : 'Applied reference frameworks'}
+        </p>
+        ${frameworksHTML}`;
 }
 
 function renderAuditData() {
@@ -1139,7 +1239,7 @@ function renderPreview() {
                 <!-- 1.3 Metodologías aplicadas -->
                 ${renderSubsectionHeader(t.methodologiesApplied, 'methodologies', '#7c3aed', '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>')}
                 <div style="background:#faf5ff; border:1px solid #e9d5ff; border-radius:10px; padding:1.5rem 2rem; line-height:1.8; color:#374151; text-align:justify; margin-bottom:2rem;">
-                    <span style="white-space:pre-wrap;">${formatMultiline(escapeHTML(getMethodologyText(d, state.lang)))}</span>
+                    ${renderMethodologiesContent(d, state.lang)}
                 </div>
             </div>
 
