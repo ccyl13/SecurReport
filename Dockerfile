@@ -49,7 +49,7 @@ RUN mkdir -p /app/data
 
 # Variables de entorno
 ENV PYTHONPATH=/app/backend
-ENV DATABASE_URL=sqlite:///./data/pentestify.db
+ENV DATABASE_URL=sqlite:///./data/securreport.db
 ENV PORT=8000
 
 # Puerto expuesto

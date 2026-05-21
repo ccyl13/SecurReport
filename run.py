@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Script para iniciar Pentestify en local.
+Script para iniciar SecurReport en local.
 
 Uso:
     python run.py              # Iniciar en http://localhost:8000
@@ -50,7 +50,7 @@ def check_playwright():
         return False, str(e)
 
 def main():
-    parser = argparse.ArgumentParser(description="Iniciar Pentestify")
+    parser = argparse.ArgumentParser(description="Iniciar SecurReport")
     parser.add_argument("--port", type=int, default=8000, help="Puerto (default: 8000)")
     parser.add_argument("--host", type=str, default="0.0.0.0", help="Host (default: 0.0.0.0)")
     parser.add_argument("--reload", action="store_true", help="Modo desarrollo con auto-reload")
@@ -59,7 +59,7 @@ def main():
     if not os.path.exists("index.html"):
         print("❌ Error: No se encontró index.html")
         print("   Asegúrate de ejecutar este script desde el directorio raíz del proyecto")
-        print("   Ejemplo: cd /Users/mario/Desktop/Automatic_Report && python run.py")
+        print("   Ejemplo: cd /opt/SecurReport && python run.py")
         sys.exit(1)
 
     if not os.path.exists("backend/main.py"):
@@ -86,7 +86,7 @@ def main():
         cmd.extend(["--reload-dir", "backend"])
     
     print("=" * 60)
-    print("🚀 Iniciando Pentestify...")
+    print("🚀 Iniciando SecurReport...")
     print("=" * 60)
     print(f"📁 Directorio: {os.getcwd()}")
     print(f"🐍 Python: {python_exec}")
