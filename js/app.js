@@ -23,7 +23,7 @@ const state = {
         incidentsText: '',
         auditSummary: '',
         testsPerformed: '',
-        recommendedSolutions: ''
+        recommendedSolutions: ''  // kept for legacy load compatibility
     },
     findings: [],
     editingFindingIndex: null,
@@ -117,12 +117,12 @@ const UI = {
         incidentsDesc: 'Descripción de las incidencias',
         incidentsNoneText: 'No se registraron incidencias durante el proceso de auditoría.',
         incidentsSectionTitle: 'Incidencias',
-        auditSummary: 'Resumen de la Auditoría',
-        auditSummaryDesc: 'Resumen ejecutivo de los hallazgos, alcance y conclusiones de la auditoría.',
-        testsPerformed: 'Pruebas Realizadas',
-        testsPerformedDesc: 'Descripción detallada de las pruebas y técnicas utilizadas durante la auditoría.',
-        recommendedSolutions: 'Soluciones Recomendadas',
-        recommendedSolutionsDesc: 'Plan de remediación con prioridades y recomendaciones generales.',
+        autoSectionsTitle: 'Secciones del Informe (auto-generadas)',
+        autoSectionsHint: 'Estas secciones se generan automáticamente a partir de las vulnerabilidades del informe.',
+        auditSummarySection: 'Resumen de la Auditoría',
+        positiveAspectsSection: 'Aspectos Positivos',
+        auditDevelopmentSection: 'Desarrollo de la Auditoría',
+        conclusionsSection: 'Conclusiones',
         // Preview/PDF translations
         index: 'Índice',
         executiveSummary: 'Resumen Ejecutivo',
@@ -216,12 +216,12 @@ const UI = {
         incidentsDesc: 'Incident description',
         incidentsNoneText: 'No incidents were recorded during the audit process.',
         incidentsSectionTitle: 'Incidents',
-        auditSummary: 'Audit Summary',
-        auditSummaryDesc: 'Executive summary of findings, scope and conclusions of the audit.',
-        testsPerformed: 'Tests Performed',
-        testsPerformedDesc: 'Detailed description of tests and techniques used during the audit.',
-        recommendedSolutions: 'Recommended Solutions',
-        recommendedSolutionsDesc: 'Remediation plan with priorities and general recommendations.',
+        autoSectionsTitle: 'Report Sections (auto-generated)',
+        autoSectionsHint: 'These sections are automatically generated from the report vulnerabilities.',
+        auditSummarySection: 'Audit Summary',
+        positiveAspectsSection: 'Positive Aspects',
+        auditDevelopmentSection: 'Audit Development',
+        conclusionsSection: 'Conclusions',
         // Preview/PDF translations
         index: 'Index',
         executiveSummary: 'Executive Summary',
@@ -544,6 +544,115 @@ function renderEditor() {
     `;
 }
 
+function generateAuditSections(findings, auditData, lang) {
+    const isEs = lang !== 'en';
+    const counts = {
+        crit: findings.filter(f => f.severity === 'crit').length,
+        high: findings.filter(f => f.severity === 'high').length,
+        med:  findings.filter(f => f.severity === 'med').length,
+        low:  findings.filter(f => f.severity === 'low').length,
+        info: findings.filter(f => f.severity === 'info').length
+    };
+    const total = findings.length;
+    const target = auditData.targetAsset || (isEs ? 'el sistema objetivo' : 'the target system');
+    const auditTypeMap = {
+        pentesting_web:      isEs ? 'pentesting web'                        : 'web pentesting',
+        caja_negra:          isEs ? 'auditoría de caja negra (Black Box)'   : 'black box audit',
+        caja_gris:           isEs ? 'auditoría de caja gris (Grey Box)'     : 'grey box audit',
+        caja_blanca:         isEs ? 'auditoría de caja blanca (White Box)'  : 'white box audit',
+        intrusion_interna:   isEs ? 'prueba de intrusión interna'           : 'internal intrusion test',
+        phishing:            isEs ? 'campaña de phishing'                   : 'phishing campaign',
+        analisis_automatico: isEs ? 'análisis automático de vulnerabilidades': 'automatic vulnerability analysis'
+    };
+    const auditTypeName = auditTypeMap[auditData.auditType] || auditData.auditType || (isEs ? 'auditoría de seguridad' : 'security audit');
+    const severityNames = isEs
+        ? { crit: 'críticas', high: 'altas', med: 'medias', low: 'bajas', info: 'informativas' }
+        : { crit: 'critical', high: 'high', med: 'medium', low: 'low', info: 'informational' };
+    const riskLevel = counts.crit > 0 ? (isEs ? 'CRÍTICO' : 'CRITICAL')
+        : counts.high > 0 ? (isEs ? 'ALTO' : 'HIGH')
+        : counts.med  > 0 ? (isEs ? 'MEDIO' : 'MEDIUM')
+        : counts.low  > 0 ? (isEs ? 'BAJO' : 'LOW')
+        : (isEs ? 'INFORMATIVO' : 'INFORMATIONAL');
+
+    // --- Resumen de la Auditoría ---
+    let auditSummary = '';
+    if (total === 0) {
+        auditSummary = isEs
+            ? `Durante la ${auditTypeName} realizada sobre ${target} no se identificaron vulnerabilidades. El sistema presenta un nivel de seguridad adecuado en todas las áreas evaluadas.`
+            : `During the ${auditTypeName} performed on ${target}, no vulnerabilities were identified. The system presents an adequate security level across all evaluated areas.`;
+    } else {
+        const parts = [];
+        if (counts.crit > 0) parts.push(`${counts.crit} ${severityNames.crit}`);
+        if (counts.high > 0) parts.push(`${counts.high} ${severityNames.high}`);
+        if (counts.med  > 0) parts.push(`${counts.med} ${severityNames.med}`);
+        if (counts.low  > 0) parts.push(`${counts.low} ${severityNames.low}`);
+        if (counts.info > 0) parts.push(`${counts.info} ${severityNames.info}`);
+        auditSummary = isEs
+            ? `Durante la ${auditTypeName} realizada sobre ${target} se identificaron un total de ${total} vulnerabilidad${total !== 1 ? 'es' : ''}, distribuidas de la siguiente manera: ${parts.join(', ')}. El nivel de riesgo global del sistema evaluado es ${riskLevel}.`
+            : `During the ${auditTypeName} performed on ${target}, a total of ${total} vulnerabilit${total !== 1 ? 'ies were' : 'y was'} identified, distributed as follows: ${parts.join(', ')}. The overall risk level of the evaluated system is ${riskLevel}.`;
+    }
+
+    // --- Aspectos Positivos ---
+    const positivePoints = [];
+    if (counts.crit === 0) positivePoints.push(isEs ? 'No se detectaron vulnerabilidades de criticidad crítica.' : 'No critical vulnerabilities were detected.');
+    if (counts.high === 0) positivePoints.push(isEs ? 'No se detectaron vulnerabilidades de criticidad alta.' : 'No high severity vulnerabilities were detected.');
+    if (counts.crit === 0 && counts.high === 0 && counts.med === 0)
+        positivePoints.push(isEs ? 'El sistema no presenta vulnerabilidades de impacto significativo.' : 'The system presents no vulnerabilities with significant impact.');
+    if (total === 0 || (counts.low + counts.info === total))
+        positivePoints.push(isEs ? 'La superficie de ataque es reducida y los hallazgos identificados son de bajo riesgo.' : 'The attack surface is limited and identified findings are low risk.');
+    if (positivePoints.length === 0)
+        positivePoints.push(isEs ? 'El sistema dispone de controles de seguridad básicos implementados que han limitado el impacto de las vulnerabilidades detectadas.' : 'The system has basic security controls in place that have limited the impact of detected vulnerabilities.');
+
+    const positiveAspects = positivePoints.join('\n');
+
+    // --- Desarrollo de la Auditoría ---
+    let auditDevelopment = '';
+    if (total === 0) {
+        auditDevelopment = isEs
+            ? `La ${auditTypeName} sobre ${target} se llevó a cabo siguiendo una metodología estructurada. No se identificaron vulnerabilidades explotables durante el proceso de evaluación.`
+            : `The ${auditTypeName} on ${target} was carried out following a structured methodology. No exploitable vulnerabilities were identified during the evaluation process.`;
+    } else {
+        const severityOrder = ['crit', 'high', 'med', 'low', 'info'];
+        const severityLabels = isEs
+            ? { crit: 'Crítico', high: 'Alto', med: 'Medio', low: 'Bajo', info: 'Informativo' }
+            : { crit: 'Critical', high: 'High', med: 'Medium', low: 'Low', info: 'Informational' };
+        const lines = [];
+        severityOrder.forEach(sev => {
+            const group = findings.filter(f => f.severity === sev);
+            if (group.length > 0) {
+                lines.push(`[${severityLabels[sev]}]`);
+                group.forEach(f => lines.push(`  • ${f.title}`));
+            }
+        });
+        const intro = isEs
+            ? `La ${auditTypeName} sobre ${target} se desarrolló de forma sistemática. A continuación se detallan los hallazgos identificados clasificados por severidad:\n\n`
+            : `The ${auditTypeName} on ${target} was developed systematically. Below are the identified findings classified by severity:\n\n`;
+        auditDevelopment = intro + lines.join('\n');
+    }
+
+    // --- Conclusiones ---
+    let conclusions = '';
+    if (total === 0) {
+        conclusions = isEs
+            ? `Tras la realización de la ${auditTypeName} sobre ${target}, no se han identificado vulnerabilidades. Se recomienda mantener los controles de seguridad actuales y realizar auditorías periódicas.`
+            : `After performing the ${auditTypeName} on ${target}, no vulnerabilities were identified. It is recommended to maintain current security controls and perform periodic audits.`;
+    } else {
+        const critHighFindings = findings.filter(f => f.severity === 'crit' || f.severity === 'high');
+        let priorityBlock = '';
+        if (critHighFindings.length > 0) {
+            const listItems = critHighFindings.map(f => `  • ${f.title}${f.remediation ? ': ' + f.remediation.split('\n')[0] : ''}`).join('\n');
+            priorityBlock = isEs
+                ? `\n\n${isEs ? 'Las siguientes vulnerabilidades requieren atención prioritaria' : 'The following vulnerabilities require priority attention'}:\n${listItems}`
+                : `\n\nThe following vulnerabilities require priority attention:\n${listItems}`;
+        }
+        conclusions = isEs
+            ? `El nivel de riesgo global del sistema ${target} es ${riskLevel}. Se recomienda abordar de forma inmediata las vulnerabilidades de mayor criticidad y establecer un plan de remediación para el resto de hallazgos. Tras aplicar las correcciones pertinentes, se aconseja realizar una nueva auditoría de verificación.${priorityBlock}`
+            : `The overall risk level of the ${target} system is ${riskLevel}. It is recommended to immediately address the most critical vulnerabilities and establish a remediation plan for the remaining findings. After applying the relevant fixes, a new verification audit is advised.${priorityBlock}`;
+    }
+
+    return { auditSummary, positiveAspects, auditDevelopment, conclusions };
+}
+
 function renderAuditData() {
     const t = UI[state.lang];
     const d = state.auditData;
@@ -659,21 +768,23 @@ function renderAuditData() {
             <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #e5e7eb;">
 
             <div class="form-group">
-                <label>${t.auditSummary}</label>
-                <small style="display:block; color:#666; margin-bottom:0.5rem; font-weight:normal;">${t.auditSummaryDesc}</small>
-                <textarea rows="4" placeholder="${t.auditSummary}..." oninput="updateAuditData('auditSummary', this.value)">${escapeHTML(d.auditSummary)}</textarea>
-            </div>
-
-            <div class="form-group">
-                <label>${t.testsPerformed}</label>
-                <small style="display:block; color:#666; margin-bottom:0.5rem; font-weight:normal;">${t.testsPerformedDesc}</small>
-                <textarea rows="4" placeholder="${t.testsPerformed}..." oninput="updateAuditData('testsPerformed', this.value)">${escapeHTML(d.testsPerformed)}</textarea>
-            </div>
-
-            <div class="form-group">
-                <label>${t.recommendedSolutions}</label>
-                <small style="display:block; color:#666; margin-bottom:0.5rem; font-weight:normal;">${t.recommendedSolutionsDesc}</small>
-                <textarea rows="4" placeholder="${t.recommendedSolutions}..." oninput="updateAuditData('recommendedSolutions', this.value)">${escapeHTML(d.recommendedSolutions)}</textarea>
+                <label>${t.autoSectionsTitle}</label>
+                <small style="display:block; color:#666; margin-bottom:1rem; font-weight:normal;">${t.autoSectionsHint}</small>
+                ${(() => {
+                    const sections = generateAuditSections(state.findings, d, state.lang);
+                    const items = [
+                        { key: 'auditSummarySection', icon: '📋', text: sections.auditSummary },
+                        { key: 'positiveAspectsSection', icon: '✅', text: sections.positiveAspects },
+                        { key: 'auditDevelopmentSection', icon: '🔍', text: sections.auditDevelopment },
+                        { key: 'conclusionsSection', icon: '📌', text: sections.conclusions }
+                    ];
+                    return items.map(item => `
+                        <div style="margin-bottom:1rem; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:1rem;">
+                            <div style="font-weight:700; color:#1e40af; margin-bottom:0.4rem;">${item.icon} ${t[item.key]}</div>
+                            <div style="color:#374151; font-size:0.875rem; white-space:pre-wrap; line-height:1.6;">${escapeHTML(item.text)}</div>
+                        </div>
+                    `).join('');
+                })()}
             </div>
         </div>
     `;
@@ -994,50 +1105,61 @@ function renderPreview() {
                 `).join('')}
             </div>
 
-            <!-- RESUMEN FINAL DE LA AUDITORÍA -->
-            ${d.auditSummary || d.testsPerformed || d.recommendedSolutions ? `
-            <div style="padding: 2rem 0; page-break-before: auto;">
-                <h2 style="font-size: 2rem; color: #111827; margin-bottom: 2rem; border-bottom: 3px solid #2563eb; padding-bottom: 0.75rem; font-weight: 800;">
-                    ${t.auditConclusions}
-                </h2>
-                
-                ${d.auditSummary ? `
-                <div id="audit-summary" style="margin-bottom: 2.5rem;">
-                    <h3 style="font-size: 1.5rem; color: #1f2937; margin-bottom: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                        ${t.auditSummary}
-                    </h3>
-                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.5rem; line-height: 1.8; color: #374151; text-align: justify;">
-                        <span style="white-space: pre-wrap;">${formatMultiline(d.auditSummary)}</span>
+            <!-- SECCIONES AUTO-GENERADAS -->
+            ${(() => {
+                const sections = generateAuditSections(state.findings, d, state.lang);
+                const sectionDefs = [
+                    {
+                        id: 'audit-summary',
+                        label: t.auditSummarySection,
+                        text: sections.auditSummary,
+                        bg: '#f8fafc', border: '#e2e8f0',
+                        iconStroke: '#2563eb',
+                        iconPath: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline>'
+                    },
+                    {
+                        id: 'positive-aspects',
+                        label: t.positiveAspectsSection,
+                        text: sections.positiveAspects,
+                        bg: '#f0fdf4', border: '#bbf7d0',
+                        iconStroke: '#059669',
+                        iconPath: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>'
+                    },
+                    {
+                        id: 'audit-development',
+                        label: t.auditDevelopmentSection,
+                        text: sections.auditDevelopment,
+                        bg: '#eff6ff', border: '#bfdbfe',
+                        iconStroke: '#3b82f6',
+                        iconPath: '<circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>'
+                    },
+                    {
+                        id: 'conclusions',
+                        label: t.conclusionsSection,
+                        text: sections.conclusions,
+                        bg: '#faf5ff', border: '#e9d5ff',
+                        iconStroke: '#7c3aed',
+                        iconPath: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M12 8v4"></path><path d="M12 16h.01"></path>'
+                    }
+                ];
+                return `
+                <div style="padding: 2rem 0; page-break-before: auto;">
+                    <h2 style="font-size: 2rem; color: #111827; margin-bottom: 2rem; border-bottom: 3px solid #2563eb; padding-bottom: 0.75rem; font-weight: 800;">
+                        ${t.auditConclusions}
+                    </h2>
+                    ${sectionDefs.map(s => `
+                    <div id="${s.id}" style="margin-bottom: 2.5rem;">
+                        <h3 style="font-size: 1.5rem; color: #1f2937; margin-bottom: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${s.iconStroke}" stroke-width="2">${s.iconPath}</svg>
+                            ${s.label}
+                        </h3>
+                        <div style="background: ${s.bg}; border: 1px solid ${s.border}; border-radius: 10px; padding: 1.5rem; line-height: 1.8; color: #374151; text-align: justify;">
+                            <span style="white-space: pre-wrap;">${formatMultiline(escapeHTML(s.text))}</span>
+                        </div>
                     </div>
-                </div>
-                ` : ''}
-                
-                ${d.testsPerformed ? `
-                <div id="tests-performed" style="margin-bottom: 2.5rem;">
-                    <h3 style="font-size: 1.5rem; color: #1f2937; margin-bottom: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
-                        ${t.testsPerformed}
-                    </h3>
-                    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 1.5rem; line-height: 1.8; color: #374151; text-align: justify;">
-                        <span style="white-space: pre-wrap;">${formatMultiline(d.testsPerformed)}</span>
-                    </div>
-                </div>
-                ` : ''}
-                
-                ${d.recommendedSolutions ? `
-                <div id="recommended-solutions">
-                    <h3 style="font-size: 1.5rem; color: #1f2937; margin-bottom: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M12 8v4"></path><path d="M12 16h.01"></path></svg>
-                        ${t.recommendedSolutions}
-                    </h3>
-                    <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 10px; padding: 1.5rem; line-height: 1.8; color: #374151; text-align: justify;">
-                        <span style="white-space: pre-wrap;">${formatMultiline(d.recommendedSolutions)}</span>
-                    </div>
-                </div>
-                ` : ''}
-            </div>
-            ` : ''}
+                    `).join('')}
+                </div>`;
+            })()}
         </div>
     `;
 }
@@ -1725,9 +1847,9 @@ async function saveCurrentReport() {
             lang: state.auditData.lang || state.lang,
             has_incidents: state.auditData.hasIncidents || false,
             incidents_text: state.auditData.incidentsText || '',
-            audit_summary: state.auditData.auditSummary || '',
-            tests_performed: state.auditData.testsPerformed || '',
-            recommended_solutions: state.auditData.recommendedSolutions || ''
+            audit_summary: '',
+            tests_performed: '',
+            recommended_solutions: ''
         };
 
         if (!state.currentReportId) {
