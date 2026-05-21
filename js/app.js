@@ -117,7 +117,7 @@ const UI = {
         incidentsDesc: 'Descripción de las incidencias',
         incidentsNoneText: 'No se registraron incidencias durante el proceso de auditoría.',
         incidentsSectionTitle: 'Incidencias',
-        autoSectionsTitle: 'Secciones del Informe (auto-generadas)',
+        autoSectionsTitle: 'Resumen de la Auditoría (auto-generado)',
         autoSectionsHint: 'Estas secciones se generan automáticamente a partir de las vulnerabilidades del informe.',
         auditSummarySection: 'Resumen de la Auditoría',
         positiveAspectsSection: 'Aspectos Positivos',
@@ -216,7 +216,7 @@ const UI = {
         incidentsDesc: 'Incident description',
         incidentsNoneText: 'No incidents were recorded during the audit process.',
         incidentsSectionTitle: 'Incidents',
-        autoSectionsTitle: 'Report Sections (auto-generated)',
+        autoSectionsTitle: 'Audit Summary (auto-generated)',
         autoSectionsHint: 'These sections are automatically generated from the report vulnerabilities.',
         auditSummarySection: 'Audit Summary',
         positiveAspectsSection: 'Positive Aspects',
@@ -555,102 +555,157 @@ function generateAuditSections(findings, auditData, lang) {
     };
     const total = findings.length;
     const target = auditData.targetAsset || (isEs ? 'el sistema objetivo' : 'the target system');
-    const auditTypeMap = {
-        pentesting_web:      isEs ? 'pentesting web'                        : 'web pentesting',
-        caja_negra:          isEs ? 'auditoría de caja negra (Black Box)'   : 'black box audit',
-        caja_gris:           isEs ? 'auditoría de caja gris (Grey Box)'     : 'grey box audit',
-        caja_blanca:         isEs ? 'auditoría de caja blanca (White Box)'  : 'white box audit',
-        intrusion_interna:   isEs ? 'prueba de intrusión interna'           : 'internal intrusion test',
-        phishing:            isEs ? 'campaña de phishing'                   : 'phishing campaign',
-        analisis_automatico: isEs ? 'análisis automático de vulnerabilidades': 'automatic vulnerability analysis'
+    const riskLabel = counts.crit > 0 ? (isEs ? 'crítico' : 'critical')
+        : counts.high > 0 ? (isEs ? 'alto' : 'high')
+        : counts.med  > 0 ? (isEs ? 'medio' : 'medium')
+        : counts.low  > 0 ? (isEs ? 'bajo' : 'low')
+        : (isEs ? 'informativo' : 'informational');
+
+    const methodologyIntros = {
+        pentesting_web: isEs
+            ? `En primer lugar, se llevó a cabo una fase de reconocimiento pasivo orientada a identificar los activos expuestos públicamente, las tecnologías en uso y posibles vectores de entrada. A continuación, se realizó un análisis activo de la aplicación web mediante técnicas manuales y herramientas especializadas de análisis de seguridad.`
+            : `First, a passive reconnaissance phase was conducted to identify publicly exposed assets, technologies in use and potential entry vectors. An active analysis of the web application was then performed using manual techniques and specialised security analysis tools.`,
+        caja_negra: isEs
+            ? `La auditoría se abordó bajo metodología de caja negra, sin conocimiento previo del entorno. En una primera fase se desarrollaron tareas de reconocimiento OSINT para identificar activos expuestos, servicios accesibles y posibles filtraciones de información en fuentes públicas. Con la información recopilada, se procedió a evaluar los vectores de ataque más relevantes.`
+            : `The audit was approached using a black box methodology, without prior knowledge of the environment. In a first phase, OSINT reconnaissance tasks were carried out to identify exposed assets, accessible services and possible information leaks in public sources. With the gathered information, the most relevant attack vectors were evaluated.`,
+        caja_gris: isEs
+            ? `Bajo metodología de caja gris, y con un conocimiento parcial del entorno proporcionado por el cliente, se procedió a analizar los vectores de ataque más relevantes. La fase de reconocimiento fue complementada con la información facilitada, lo que permitió optimizar el alcance de las pruebas realizadas.`
+            : `Under a grey box methodology, with partial knowledge of the environment provided by the client, the most relevant attack vectors were analysed. The reconnaissance phase was supplemented with the information provided, which allowed the scope of the tests to be optimised.`,
+        caja_blanca: isEs
+            ? `Bajo metodología de caja blanca, con acceso completo al código fuente, documentación y arquitectura del sistema, se realizó una revisión exhaustiva de los flujos de autenticación, autorización, gestión de sesiones y tratamiento de datos. El análisis incluyó tanto revisión estática del código como pruebas dinámicas sobre el entorno habilitado.`
+            : `Under a white box methodology, with full access to source code, documentation and system architecture, an exhaustive review of authentication, authorisation, session management and data handling flows was carried out. The analysis included both static code review and dynamic testing on the enabled environment.`,
+        intrusion_interna: isEs
+            ? `La prueba de intrusión interna se desarrolló simulando el comportamiento de un atacante con acceso físico o lógico a la red corporativa. En una primera fase se llevaron a cabo tareas de enumeración de servicios, identificación de activos internos y análisis de vectores de movimiento lateral.`
+            : `The internal intrusion test was carried out simulating the behaviour of an attacker with physical or logical access to the corporate network. In a first phase, service enumeration, internal asset identification and lateral movement vector analysis tasks were performed.`,
+        phishing: isEs
+            ? `La campaña de phishing se diseñó para evaluar el grado de concienciación del personal ante correos electrónicos maliciosos y técnicas de ingeniería social. Se simularon distintos escenarios de ataque, variando el pretexto, el nivel de personalización y los mecanismos de captura empleados.`
+            : `The phishing campaign was designed to assess staff awareness against malicious emails and social engineering techniques. Different attack scenarios were simulated, varying the pretext, level of personalisation and capture mechanisms used.`,
+        analisis_automatico: isEs
+            ? `Se llevó a cabo un análisis automático de vulnerabilidades mediante herramientas especializadas de escaneo activo. Los resultados obtenidos fueron revisados y validados manualmente con el fin de descartar falsos positivos y determinar la explotabilidad real de cada hallazgo.`
+            : `An automatic vulnerability analysis was carried out using specialised active scanning tools. The results obtained were manually reviewed and validated in order to rule out false positives and determine the real exploitability of each finding.`
     };
-    const auditTypeName = auditTypeMap[auditData.auditType] || auditData.auditType || (isEs ? 'auditoría de seguridad' : 'security audit');
-    const severityNames = isEs
-        ? { crit: 'críticas', high: 'altas', med: 'medias', low: 'bajas', info: 'informativas' }
-        : { crit: 'critical', high: 'high', med: 'medium', low: 'low', info: 'informational' };
-    const riskLevel = counts.crit > 0 ? (isEs ? 'CRÍTICO' : 'CRITICAL')
-        : counts.high > 0 ? (isEs ? 'ALTO' : 'HIGH')
-        : counts.med  > 0 ? (isEs ? 'MEDIO' : 'MEDIUM')
-        : counts.low  > 0 ? (isEs ? 'BAJO' : 'LOW')
-        : (isEs ? 'INFORMATIVO' : 'INFORMATIONAL');
+    const methodologyText = methodologyIntros[auditData.auditType] || (isEs
+        ? `Se llevó a cabo una auditoría de seguridad sobre ${target} siguiendo una metodología estructurada que combina técnicas de análisis manual y automatizado.`
+        : `A security audit was conducted on ${target} following a structured methodology combining manual and automated analysis techniques.`);
 
-    // --- Resumen de la Auditoría ---
-    let auditSummary = '';
-    if (total === 0) {
-        auditSummary = isEs
-            ? `Durante la ${auditTypeName} realizada sobre ${target} no se identificaron vulnerabilidades. El sistema presenta un nivel de seguridad adecuado en todas las áreas evaluadas.`
-            : `During the ${auditTypeName} performed on ${target}, no vulnerabilities were identified. The system presents an adequate security level across all evaluated areas.`;
+    // --- ASPECTOS POSITIVOS ---
+    const positives = [];
+    if (counts.crit === 0 && counts.high === 0) {
+        positives.push(isEs
+            ? `La infraestructura auditada no presenta vulnerabilidades de carácter crítico ni alto, lo que indica que los controles de seguridad perimetrales se encuentran correctamente implementados.`
+            : `The audited infrastructure does not present critical or high severity vulnerabilities, indicating that perimeter security controls are correctly implemented.`);
+    } else if (counts.crit === 0) {
+        positives.push(isEs
+            ? `No se han identificado vulnerabilidades de criticidad crítica en el sistema, lo que refleja que los controles de seguridad de mayor impacto están adecuadamente aplicados.`
+            : `No critical severity vulnerabilities have been identified in the system, reflecting that the highest-impact security controls are adequately applied.`);
+    }
+    if (['pentesting_web','caja_negra','caja_gris'].includes(auditData.auditType)) {
+        positives.push(isEs
+            ? `Las comunicaciones del sistema se realizan mediante protocolo HTTPS, lo que garantiza la confidencialidad e integridad de los datos en tránsito.`
+            : `System communications are carried out using the HTTPS protocol, ensuring the confidentiality and integrity of data in transit.`);
+    }
+    if (counts.crit === 0 && counts.high === 0 && counts.med === 0) {
+        positives.push(isEs
+            ? `El sistema no presenta vulnerabilidades de impacto operativo significativo. Los hallazgos identificados son de carácter menor y no comprometen la integridad global de la plataforma.`
+            : `The system does not present vulnerabilities with significant operational impact. The identified findings are minor in nature and do not compromise the overall integrity of the platform.`);
     } else {
-        const parts = [];
-        if (counts.crit > 0) parts.push(`${counts.crit} ${severityNames.crit}`);
-        if (counts.high > 0) parts.push(`${counts.high} ${severityNames.high}`);
-        if (counts.med  > 0) parts.push(`${counts.med} ${severityNames.med}`);
-        if (counts.low  > 0) parts.push(`${counts.low} ${severityNames.low}`);
-        if (counts.info > 0) parts.push(`${counts.info} ${severityNames.info}`);
-        auditSummary = isEs
-            ? `Durante la ${auditTypeName} realizada sobre ${target} se identificaron un total de ${total} vulnerabilidad${total !== 1 ? 'es' : ''}, distribuidas de la siguiente manera: ${parts.join(', ')}. El nivel de riesgo global del sistema evaluado es ${riskLevel}.`
-            : `During the ${auditTypeName} performed on ${target}, a total of ${total} vulnerabilit${total !== 1 ? 'ies were' : 'y was'} identified, distributed as follows: ${parts.join(', ')}. The overall risk level of the evaluated system is ${riskLevel}.`;
+        positives.push(isEs
+            ? `A pesar de los hallazgos detectados, el sistema dispone de controles que han limitado la superficie de exposición y dificultado la explotación encadenada de vulnerabilidades.`
+            : `Despite the detected findings, the system has controls that have limited the exposure surface and made chained exploitation of vulnerabilities more difficult.`);
+    }
+    const positiveAspects = positives.join('\n\n');
+
+    // --- DESARROLLO DE LA AUDITORÍA ---
+    let auditDevelopment = methodologyText;
+    if (total === 0) {
+        auditDevelopment += isEs
+            ? `\n\nA lo largo del proceso de evaluación no se identificaron vulnerabilidades explotables en el sistema.`
+            : `\n\nThroughout the evaluation process, no exploitable vulnerabilities were identified in the system.`;
+    } else {
+        const countParts = [];
+        if (counts.crit > 0) countParts.push(isEs ? `${counts.crit} de criticidad crítica` : `${counts.crit} critical`);
+        if (counts.high > 0) countParts.push(isEs ? `${counts.high} de criticidad alta` : `${counts.high} high`);
+        if (counts.med  > 0) countParts.push(isEs ? `${counts.med} de criticidad media` : `${counts.med} medium`);
+        if (counts.low  > 0) countParts.push(isEs ? `${counts.low} de criticidad baja` : `${counts.low} low`);
+        if (counts.info > 0) countParts.push(isEs ? `${counts.info} de carácter informativo` : `${counts.info} informational`);
+        auditDevelopment += isEs
+            ? `\n\nA lo largo del proceso se identificaron un total de ${total} vulnerabilidad${total !== 1 ? 'es' : ''}: ${countParts.join(', ')}.`
+            : `\n\nThroughout the process, a total of ${total} vulnerabilit${total !== 1 ? 'ies were' : 'y was'} identified: ${countParts.join(', ')}.`;
+
+        const critHighFindings = findings.filter(f => f.severity === 'crit' || f.severity === 'high');
+        if (critHighFindings.length > 0) {
+            const sevWord = { crit: isEs ? 'crítica' : 'critical', high: isEs ? 'alta' : 'high' };
+            const desc = critHighFindings.map(f => {
+                const imp = f.impact ? (isEs ? ` con impacto en ${f.impact.split('.')[0].substring(0,80)}` : ` with impact on ${f.impact.split('.')[0].substring(0,80)}`) : '';
+                return `"${f.title}" (${sevWord[f.severity]})${imp}`;
+            }).join('; ');
+            auditDevelopment += isEs
+                ? ` Entre los hallazgos de mayor relevancia figuran: ${desc}.`
+                : ` Among the most relevant findings are: ${desc}.`;
+        }
+
+        const medFindings = findings.filter(f => f.severity === 'med');
+        if (medFindings.length > 0) {
+            const list = medFindings.map(f => `"${f.title}"`).join(', ');
+            auditDevelopment += isEs
+                ? `\n\nAdicionalmente, se detectaron ${medFindings.length} vulnerabilidad${medFindings.length !== 1 ? 'es' : ''} de severidad media: ${list}.`
+                : `\n\nAdditionally, ${medFindings.length} medium severity vulnerabilit${medFindings.length !== 1 ? 'ies were' : 'y was'} detected: ${list}.`;
+        }
+
+        const lowInfoFindings = findings.filter(f => f.severity === 'low' || f.severity === 'info');
+        if (lowInfoFindings.length > 0) {
+            const list = lowInfoFindings.map(f => `"${f.title}"`).join(', ');
+            auditDevelopment += isEs
+                ? `\n\nPor último, se registraron ${lowInfoFindings.length} hallazgo${lowInfoFindings.length !== 1 ? 's' : ''} de baja criticidad o de tipo informativo: ${list}.`
+                : `\n\nFinally, ${lowInfoFindings.length} low severity or informational finding${lowInfoFindings.length !== 1 ? 's were' : ' was'} recorded: ${list}.`;
+        }
     }
 
-    // --- Aspectos Positivos ---
-    const positivePoints = [];
-    if (counts.crit === 0) positivePoints.push(isEs ? 'No se detectaron vulnerabilidades de criticidad crítica.' : 'No critical vulnerabilities were detected.');
-    if (counts.high === 0) positivePoints.push(isEs ? 'No se detectaron vulnerabilidades de criticidad alta.' : 'No high severity vulnerabilities were detected.');
-    if (counts.crit === 0 && counts.high === 0 && counts.med === 0)
-        positivePoints.push(isEs ? 'El sistema no presenta vulnerabilidades de impacto significativo.' : 'The system presents no vulnerabilities with significant impact.');
-    if (total === 0 || (counts.low + counts.info === total))
-        positivePoints.push(isEs ? 'La superficie de ataque es reducida y los hallazgos identificados son de bajo riesgo.' : 'The attack surface is limited and identified findings are low risk.');
-    if (positivePoints.length === 0)
-        positivePoints.push(isEs ? 'El sistema dispone de controles de seguridad básicos implementados que han limitado el impacto de las vulnerabilidades detectadas.' : 'The system has basic security controls in place that have limited the impact of detected vulnerabilities.');
-
-    const positiveAspects = positivePoints.join('\n');
-
-    // --- Desarrollo de la Auditoría ---
-    let auditDevelopment = '';
-    if (total === 0) {
-        auditDevelopment = isEs
-            ? `La ${auditTypeName} sobre ${target} se llevó a cabo siguiendo una metodología estructurada. No se identificaron vulnerabilidades explotables durante el proceso de evaluación.`
-            : `The ${auditTypeName} on ${target} was carried out following a structured methodology. No exploitable vulnerabilities were identified during the evaluation process.`;
-    } else {
-        const severityOrder = ['crit', 'high', 'med', 'low', 'info'];
-        const severityLabels = isEs
-            ? { crit: 'Crítico', high: 'Alto', med: 'Medio', low: 'Bajo', info: 'Informativo' }
-            : { crit: 'Critical', high: 'High', med: 'Medium', low: 'Low', info: 'Informational' };
-        const lines = [];
-        severityOrder.forEach(sev => {
-            const group = findings.filter(f => f.severity === sev);
-            if (group.length > 0) {
-                lines.push(`[${severityLabels[sev]}]`);
-                group.forEach(f => lines.push(`  • ${f.title}`));
-            }
-        });
-        const intro = isEs
-            ? `La ${auditTypeName} sobre ${target} se desarrolló de forma sistemática. A continuación se detallan los hallazgos identificados clasificados por severidad:\n\n`
-            : `The ${auditTypeName} on ${target} was developed systematically. Below are the identified findings classified by severity:\n\n`;
-        auditDevelopment = intro + lines.join('\n');
-    }
-
-    // --- Conclusiones ---
+    // --- CONCLUSIONES ---
     let conclusions = '';
     if (total === 0) {
         conclusions = isEs
-            ? `Tras la realización de la ${auditTypeName} sobre ${target}, no se han identificado vulnerabilidades. Se recomienda mantener los controles de seguridad actuales y realizar auditorías periódicas.`
-            : `After performing the ${auditTypeName} on ${target}, no vulnerabilities were identified. It is recommended to maintain current security controls and perform periodic audits.`;
+            ? `La auditoría realizada sobre ${target} no ha revelado vulnerabilidades explotables dentro del alcance evaluado. El sistema mantiene un nivel de seguridad adecuado para el contexto en el que opera. Se recomienda mantener los controles actuales y establecer un ciclo de auditorías periódicas que permita detectar posibles regresiones ante cambios futuros en la infraestructura.`
+            : `The audit carried out on ${target} has not revealed exploitable vulnerabilities within the evaluated scope. The system maintains an adequate security level for the context in which it operates. It is recommended to maintain current controls and establish a periodic audit cycle to detect possible regressions in the face of future infrastructure changes.`;
     } else {
-        const critHighFindings = findings.filter(f => f.severity === 'crit' || f.severity === 'high');
-        let priorityBlock = '';
-        if (critHighFindings.length > 0) {
-            const listItems = critHighFindings.map(f => `  • ${f.title}${f.remediation ? ': ' + f.remediation.split('\n')[0] : ''}`).join('\n');
-            priorityBlock = isEs
-                ? `\n\n${isEs ? 'Las siguientes vulnerabilidades requieren atención prioritaria' : 'The following vulnerabilities require priority attention'}:\n${listItems}`
-                : `\n\nThe following vulnerabilities require priority attention:\n${listItems}`;
+        const urgency = counts.crit > 0 || counts.high > 0
+            ? (isEs
+                ? ` Las vulnerabilidades de criticidad crítica y alta requieren atención inmediata, dado el riesgo que representan para la confidencialidad, integridad y disponibilidad del sistema.`
+                : ` Critical and high severity vulnerabilities require immediate attention, given the risk they represent to the confidentiality, integrity and availability of the system.`)
+            : (isEs
+                ? ` Se recomienda abordar los hallazgos de forma planificada, integrando su corrección en el ciclo de desarrollo o mantenimiento habitual.`
+                : ` It is recommended to address the findings in a planned manner, integrating their correction into the usual development or maintenance cycle.`);
+
+        const findingsWithRem = findings
+            .filter(f => f.remediation && f.remediation.trim().length > 0)
+            .sort((a,b) => ['crit','high','med','low','info'].indexOf(a.severity) - ['crit','high','med','low','info'].indexOf(b.severity));
+        const sevLabelMap = isEs
+            ? { crit: 'Crítica', high: 'Alta', med: 'Media', low: 'Baja', info: 'Informativa' }
+            : { crit: 'Critical', high: 'High', med: 'Medium', low: 'Low', info: 'Informational' };
+
+        let remBlock = '';
+        if (findingsWithRem.length > 0) {
+            const items = findingsWithRem.map(f => `• ${f.title} [${sevLabelMap[f.severity]}]: ${f.remediation.trim()}`).join('\n\n');
+            remBlock = isEs
+                ? `\n\nA continuación se detallan las medidas de remediación recomendadas:\n\n${items}`
+                : `\n\nBelow are the recommended remediation measures:\n\n${items}`;
+        } else {
+            remBlock = isEs
+                ? `\n\nSe recomienda revisar cada hallazgo identificado y aplicar las correcciones pertinentes priorizando los de mayor criticidad.`
+                : `\n\nIt is recommended to review each identified finding and apply the relevant corrections, prioritising those with the highest criticality.`;
         }
-        conclusions = isEs
-            ? `El nivel de riesgo global del sistema ${target} es ${riskLevel}. Se recomienda abordar de forma inmediata las vulnerabilidades de mayor criticidad y establecer un plan de remediación para el resto de hallazgos. Tras aplicar las correcciones pertinentes, se aconseja realizar una nueva auditoría de verificación.${priorityBlock}`
-            : `The overall risk level of the ${target} system is ${riskLevel}. It is recommended to immediately address the most critical vulnerabilities and establish a remediation plan for the remaining findings. After applying the relevant fixes, a new verification audit is advised.${priorityBlock}`;
+
+        const closing = isEs
+            ? `\n\nUna vez aplicadas las correcciones, se aconseja llevar a cabo una auditoría de verificación que confirme la resolución efectiva de las vulnerabilidades reportadas.`
+            : `\n\nOnce the corrections have been applied, it is advisable to carry out a verification audit confirming the effective resolution of the reported vulnerabilities.`;
+
+        conclusions = (isEs
+            ? `El nivel de riesgo global de ${target} se considera ${riskLabel} en base a los hallazgos identificados durante la presente auditoría.`
+            : `The overall risk level of ${target} is considered ${riskLabel} based on the findings identified during this audit.`)
+            + urgency + remBlock + closing;
     }
 
-    return { auditSummary, positiveAspects, auditDevelopment, conclusions };
+    return { positiveAspects, auditDevelopment, conclusions };
 }
 
 function renderAuditData() {
@@ -773,7 +828,6 @@ function renderAuditData() {
                 ${(() => {
                     const sections = generateAuditSections(state.findings, d, state.lang);
                     const items = [
-                        { key: 'auditSummarySection', icon: '📋', text: sections.auditSummary },
                         { key: 'positiveAspectsSection', icon: '✅', text: sections.positiveAspects },
                         { key: 'auditDevelopmentSection', icon: '🔍', text: sections.auditDevelopment },
                         { key: 'conclusionsSection', icon: '📌', text: sections.conclusions }
@@ -1105,52 +1159,41 @@ function renderPreview() {
                 `).join('')}
             </div>
 
-            <!-- SECCIONES AUTO-GENERADAS -->
+            <!-- RESUMEN DE LA AUDITORÍA (auto-generado) -->
             ${(() => {
                 const sections = generateAuditSections(state.findings, d, state.lang);
-                const sectionDefs = [
-                    {
-                        id: 'audit-summary',
-                        label: t.auditSummarySection,
-                        text: sections.auditSummary,
-                        bg: '#f8fafc', border: '#e2e8f0',
-                        iconStroke: '#2563eb',
-                        iconPath: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline>'
-                    },
+                const subsections = [
                     {
                         id: 'positive-aspects',
                         label: t.positiveAspectsSection,
                         text: sections.positiveAspects,
-                        bg: '#f0fdf4', border: '#bbf7d0',
-                        iconStroke: '#059669',
+                        bg: '#f0fdf4', border: '#bbf7d0', iconStroke: '#059669',
                         iconPath: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>'
                     },
                     {
                         id: 'audit-development',
                         label: t.auditDevelopmentSection,
                         text: sections.auditDevelopment,
-                        bg: '#eff6ff', border: '#bfdbfe',
-                        iconStroke: '#3b82f6',
+                        bg: '#eff6ff', border: '#bfdbfe', iconStroke: '#3b82f6',
                         iconPath: '<circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>'
                     },
                     {
                         id: 'conclusions',
                         label: t.conclusionsSection,
                         text: sections.conclusions,
-                        bg: '#faf5ff', border: '#e9d5ff',
-                        iconStroke: '#7c3aed',
+                        bg: '#faf5ff', border: '#e9d5ff', iconStroke: '#7c3aed',
                         iconPath: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M12 8v4"></path><path d="M12 16h.01"></path>'
                     }
                 ];
                 return `
-                <div style="padding: 2rem 0; page-break-before: auto;">
+                <div style="padding: 2rem 0; page-break-before: always;">
                     <h2 style="font-size: 2rem; color: #111827; margin-bottom: 2rem; border-bottom: 3px solid #2563eb; padding-bottom: 0.75rem; font-weight: 800;">
-                        ${t.auditConclusions}
+                        ${t.auditSummarySection}
                     </h2>
-                    ${sectionDefs.map(s => `
+                    ${subsections.map(s => `
                     <div id="${s.id}" style="margin-bottom: 2.5rem;">
-                        <h3 style="font-size: 1.5rem; color: #1f2937; margin-bottom: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${s.iconStroke}" stroke-width="2">${s.iconPath}</svg>
+                        <h3 style="font-size: 1.35rem; color: #1f2937; margin-bottom: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${s.iconStroke}" stroke-width="2">${s.iconPath}</svg>
                             ${s.label}
                         </h3>
                         <div style="background: ${s.bg}; border: 1px solid ${s.border}; border-radius: 10px; padding: 1.5rem; line-height: 1.8; color: #374151; text-align: justify;">
